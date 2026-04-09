@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NutriPlanner PRO</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- html2pdf para geração de relatórios -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Print Styles - Correção para permitir impressão de tela cheia e layout minimalista */
+        @media print {
+            body, main, .tab-content { 
+                height: auto !important; 
+                overflow: visible !important; 
+                display: block !important; 
+                position: static !important; 
+                background-color: white !important;
+            }
+            aside, .no-print, header, nav, #mobile-nav, button { 
+                display: none !important; 
+            }
+            #tab-menu { display: block !important; }
+            .tab-content:not(#tab-menu) { display: none !important; }
+            
+            /* Layout Limpo na Impressão */
+            #print-area { border: none !important; box-shadow: none !important; padding: 0 !important; width: 100%; margin: 0; }
+            #print-area .bg-slate-50, #print-area .bg-slate-100, #print-area .bg-emerald-50\/50, #print-area .bg-emerald-100\/50 { background-color: white !important; }
+            #print-area .rounded-lg, #print-area .rounded-xl { border-radius: 0 !important; }
+            
+            .print-break { page-break-inside: avoid; margin-bottom: 24px; }
+        }
+
+        /* Classes para o Modo de Exportação PDF (Layout Limpo) */
+        .pdf-export-mode {
+            border: none !important;
+            box-shadow: none !important;
+            padding: 10px 20px !important;
+        }
+        .pdf-export-mode .bg-slate-50, 
+        .pdf-export-mode .bg-slate-100, 
+        .pdf-export-mode .bg-emerald-50\/50, 
+        .pdf-export-mode .bg-emerald-100\/50 {
+            background-color: white !important;
+        }
+        .pdf-export-mode .rounded-lg, 
+        .pdf-export-mode .rounded-xl {
+            border-radius: 0 !important;
+        }
+        .pdf-export-mode .border-slate-200 {
+            border-color: #cbd5e1 !important;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .progress-bar-transition { transition: width 0.3s ease; }
+
+        /* Modal Transitions */
+        .modal { opacity: 0; pointer-events: none; transition: all 0.3s ease; }
+        .modal.active { opacity: 1; pointer-events: auto; }
+        .modal-content { transform: translateY(-20px); transition: all 0.3s ease; }
+        .modal.active .modal-content { transform: translateY(0); }
+    </style>
+</head>
+<body class="text-slate-800 flex h-screen overflow-hidden relative">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col no-print z-10 hidden md:flex">
+        <div class="h-16 flex items-center px-6 border-b border-slate-200">
+            <i data-lucide="utensils-crossed" class="text-emerald-600 mr-2 h-6 w-6"></i>
+            <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-500">NutriPlanner <span class="text-slate-800">PRO</span></span>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-4">
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="switchTab('calc')" id="btn-tab-calc" class="w-full flex items-center px-6 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-emerald-600 border-r-4 border-transparent active-tab">
+                        <i data-lucide="calculator" class="mr-3 h-5 w-5"></i> Calculadora TMB
+                    </button>
+                </li>
+                <li>
+                    <button onclick="switchTab('plan')" id="btn-tab-plan" class="w-full flex items-center px-6 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-emerald-600 border-r-4 border-transparent">
+                        <i data-lucide="layout-list" class="mr-3 h-5 w-5"></i> Planejamento
+                    </button>
+                </li>
+                <li>
+                    <button onclick="switchTab('menu')" id="btn-tab-menu" class="w-full flex items-center px-6 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-emerald-600 border-r-4 border-transparent">
+                        <i data-lucide="file-text" class="mr-3 h-5 w-5"></i> Cardápio Cliente
+                    </button>
+                </li>
+                <li>
+                    <button onclick="switchTab('foods')" id="btn-tab-foods" class="w-full flex items-center px-6 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-emerald-600 border-r-4 border-transparent">
+                        <i data-lucide="database" class="mr-3 h-5 w-5"></i> Base Alimentos
+                    </button>
+                </li>
+            </ul>
+        </nav>
+        <div class="p-4 border-t border-slate-200 text-xs text-center text-slate-500">
+            NutriPlanner PRO v1.5<br>Sistema de Prescrição com IA
+        </div>
+    </aside>
+
+    <!-- Mobile Header -->
+    <div class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-20 no-print">
+        <div class="flex items-center">
+            <i data-lucide="utensils-crossed" class="text-emerald-600 mr-2 h-6 w-6"></i>
+            <span class="text-lg font-bold">NutriPlanner</span>
+        </div>
+        <select id="mobile-nav" onchange="switchTab(this.value)" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded focus:ring-emerald-500 focus:border-emerald-500 block p-2">
+            <option value="calc">Calculadora</option>
+            <option value="plan">Planejamento</option>
+            <option value="menu">Cardápio</option>
+            <option value="foods">Base de Dados</option>
+        </select>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto bg-slate-50 pt-16 md:pt-0 relative">
+        
+        <!-- Toast Notification Container -->
+        <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 no-print"></div>
+
+        <div class="p-4 md:p-8 max-w-7xl mx-auto w-full pb-32">
+            
+            <!-- TAB: CALCULADORA -->
+            <section id="tab-calc" class="tab-content active">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800">Calculadora de TMB e GET</h2>
+                    <p class="text-slate-500">Fórmula de Mifflin-St Jeor para estimativa de gasto energético.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Form -->
+                    <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="text-lg font-semibold mb-4 text-slate-700 flex items-center"><i data-lucide="user" class="h-5 w-5 mr-2 text-emerald-500"></i> Dados do Paciente</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Nome do Aluno(a)</label>
+                                <input type="text" id="calc-name" value="Tamires Iamara" placeholder="Ex: João Silva" class="w-full rounded-lg border-slate-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Sexo</label>
+                                <select id="calc-sex" class="w-full rounded-lg border-slate-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500">
+                                    <option value="M">Masculino</option>
+                                    <option value="F" selected>Feminino</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Peso (kg)</label>
+                                    <input type="number" id="calc-weight" value="99.0" step="0.1" class="w-full rounded-lg border-slate-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Altura (cm)</label>
+                                    <input type="number" id="calc-height" value="170" class="w-full rounded-lg border-slate-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Idade (anos)</label>
+                                <input type="number" id="calc-age" value="34" class="w-full rounded-lg border-slate-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Nível de Atividade</label>
+                                <select id="calc-activity" class="w-full rounded-lg border-slate-300 border p-2.5 focus:ring-emerald-500 focus:border-emerald-500">
+                                    <option value="1.2">Sedentário (1.20)</option>
+                                    <option value="1.375">Leve (1.375)</option>
+                                    <option value="1.55">Moderado (1.55)</option>
+                                    <option value="1.725">Intenso (1.725)</option>
+                                    <option value="1.9">Muito Intenso (1.90)</option>
+                                </select>
+                            </div>
+                            <button onclick="calculateMetabolism()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-4 rounded-lg transition mt-4">
+                                Calcular
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Results -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 shadow-sm text-white">
+                                <h4 class="text-slate-400 text-sm font-medium mb-1">Taxa Metabólica Basal (TMB)</h4>
+                                <div class="text-4xl font-bold mb-2"><span id="res-tmb">0</span> <span class="text-xl text-slate-400 font-normal">kcal</span></div>
+                                <p class="text-xs text-slate-400" id="res-tmb-kg">0 kcal/kg</p>
+                            </div>
+                            <div class="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-xl p-6 shadow-sm text-white">
+                                <h4 class="text-emerald-100 text-sm font-medium mb-1">Gasto Energético Total (GET)</h4>
+                                <div class="text-4xl font-bold mb-2"><span id="res-get">0</span> <span class="text-xl text-emerald-200 font-normal">kcal</span></div>
+                                <p class="text-xs text-emerald-200" id="res-get-kg">0 kcal/kg</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h3 class="text-lg font-semibold mb-4 text-slate-700">Metas Sugeridas</h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <button onclick="setPlannerGoal(window.currentGET - 500)" class="text-left p-4 border border-slate-200 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition group">
+                                    <div class="text-sm text-slate-500 group-hover:text-emerald-600 mb-1">Emagrecimento Moderado (-500 kcal)</div>
+                                    <div class="text-xl font-bold text-slate-800"><span id="meta-emag-mod">0</span> kcal</div>
+                                </button>
+                                <button onclick="setPlannerGoal(window.currentGET - 300)" class="text-left p-4 border border-slate-200 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition group">
+                                    <div class="text-sm text-slate-500 group-hover:text-emerald-600 mb-1">Emagrecimento Leve (-300 kcal)</div>
+                                    <div class="text-xl font-bold text-slate-800"><span id="meta-emag-leve">0</span> kcal</div>
+                                </button>
+                                <button onclick="setPlannerGoal(window.currentGET)" class="text-left p-4 border border-slate-200 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition group">
+                                    <div class="text-sm text-slate-500 group-hover:text-emerald-600 mb-1">Manutenção</div>
+                                    <div class="text-xl font-bold text-slate-800"><span id="meta-manut">0</span> kcal</div>
+                                </button>
+                                <button onclick="setPlannerGoal(window.currentGET + 300)" class="text-left p-4 border border-slate-200 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition group">
+                                    <div class="text-sm text-slate-500 group-hover:text-emerald-600 mb-1">Ganho Leve (+300 kcal)</div>
+                                    <div class="text-xl font-bold text-slate-800"><span id="meta-ganho-leve">0</span> kcal</div>
+                                </button>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-4 text-center"><i data-lucide="info" class="inline h-3 w-3"></i> Clique em uma meta para enviá-la ao Planejamento.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: PLANEJAMENTO -->
+            <section id="tab-plan" class="tab-content">
+                <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Planejamento Alimentar</h2>
+                        <p class="text-slate-500">Distribuição de macros e montagem de refeições.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="openAIModal()" class="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg text-sm flex items-center transition shadow-sm">
+                            <i data-lucide="wand-2" class="h-4 w-4 mr-2"></i> Gerar com IA
+                        </button>
+                        <button onclick="clearDiet()" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium py-2 px-4 rounded-lg text-sm flex items-center transition">
+                            <i data-lucide="trash-2" class="h-4 w-4 mr-2"></i> Limpar Tudo
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Configuração de Metas (Sticky Top in Desktop) -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 sticky top-0 z-10 no-print">
+                    <div class="grid grid-cols-2 md:grid-cols-6 gap-4 items-end">
+                        <div class="col-span-2 md:col-span-2">
+                            <label class="block text-xs font-medium text-slate-500 mb-1">Calorias Alvo (kcal)</label>
+                            <input type="number" id="plan-target-kcal" value="1766" onchange="calculateMacrosConfig()" class="w-full text-lg font-bold rounded-lg border-slate-300 border p-2 focus:ring-emerald-500 focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-blue-500 mb-1">% Carbo</label>
+                            <input type="number" id="plan-pct-c" value="34" onchange="calculateMacrosConfig()" class="w-full rounded-lg border-blue-200 bg-blue-50 border p-2 focus:ring-blue-500 text-center">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-red-500 mb-1">% Prot</label>
+                            <input type="number" id="plan-pct-p" value="33" onchange="calculateMacrosConfig()" class="w-full rounded-lg border-red-200 bg-red-50 border p-2 focus:ring-red-500 text-center">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-amber-500 mb-1">% Gord</label>
+                            <input type="number" id="plan-pct-g" value="33" onchange="calculateMacrosConfig()" class="w-full rounded-lg border-amber-200 bg-amber-50 border p-2 focus:ring-amber-500 text-center">
+                        </div>
+                        <div class="text-center pt-2">
+                            <div class="text-xs font-medium text-slate-500 mb-1">Total %</div>
+                            <div id="plan-pct-total" class="font-bold text-slate-700">100%</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Bars -->
+                    <div class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-4 gap-4">
+                        <div class="text-center">
+                            <div class="text-xs text-slate-500 mb-1">Kcal Alcançadas</div>
+                            <div class="font-bold text-slate-800"><span id="curr-kcal">0</span> / <span id="tgt-kcal">1766</span></div>
+                            <div class="w-full bg-slate-100 rounded-full h-1.5 mt-1"><div id="bar-kcal" class="bg-slate-800 h-1.5 rounded-full progress-bar-transition" style="width: 0%"></div></div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xs text-blue-500 mb-1">Carboidrato (g)</div>
+                            <div class="font-bold text-slate-800"><span id="curr-c">0</span> / <span id="tgt-c">0</span></div>
+                            <div class="w-full bg-blue-100 rounded-full h-1.5 mt-1"><div id="bar-c" class="bg-blue-500 h-1.5 rounded-full progress-bar-transition" style="width: 0%"></div></div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xs text-red-500 mb-1">Proteína (g)</div>
+                            <div class="font-bold text-slate-800"><span id="curr-p">0</span> / <span id="tgt-p">0</span></div>
+                            <div class="w-full bg-red-100 rounded-full h-1.5 mt-1"><div id="bar-p" class="bg-red-500 h-1.5 rounded-full progress-bar-transition" style="width: 0%"></div></div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xs text-amber-500 mb-1">Gordura (g)</div>
+                            <div class="font-bold text-slate-800"><span id="curr-g">0</span> / <span id="tgt-g">0</span></div>
+                            <div class="w-full bg-amber-100 rounded-full h-1.5 mt-1"><div id="bar-g" class="bg-amber-500 h-1.5 rounded-full progress-bar-transition" style="width: 0%"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Meals Container -->
+                <div id="meals-container" class="space-y-6">
+                    <!-- Gerado via JS -->
+                </div>
+                
+            </section>
+
+            <!-- TAB: CARDÁPIO (PRINT) -->
+            <section id="tab-menu" class="tab-content">
+                <div class="mb-6 flex justify-between items-center no-print">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Cardápio do Cliente</h2>
+                        <p class="text-slate-500">Visualização limpa com substituições geradas automaticamente.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="window.print()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-lg flex items-center transition shadow-sm">
+                            <i data-lucide="printer" class="h-4 w-4 mr-2"></i> Imprimir
+                        </button>
+                        <button onclick="generatePDF()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg flex items-center transition shadow-sm">
+                            <i data-lucide="file-down" class="h-4 w-4 mr-2"></i> Gerar PDF
+                        </button>
+                    </div>
+                </div>
+
+                <div id="print-area" class="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+                    <div class="text-center mb-6 border-b pb-4">
+                        <h1 class="text-3xl font-bold text-slate-800 mb-2">Plano Alimentar</h1>
+                        <p class="text-slate-500">Meta Diária: <span id="print-meta-kcal" class="font-bold"></span> kcal</p>
+                    </div>
+
+                    <!-- Dados do Paciente Header -->
+                    <div class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-b border-slate-200 pb-6 bg-slate-50 p-4 rounded-lg">
+                        <div class="col-span-2 md:col-span-4 flex justify-between items-end border-b border-slate-200 pb-3 mb-2">
+                            <div><span class="text-slate-500 block text-xs uppercase tracking-wider font-semibold mb-1">Nome do Aluno(a):</span> <strong id="print-paciente-nome" class="text-xl text-slate-800">-</strong></div>
+                            <div class="text-right"><span class="text-slate-500 block text-xs uppercase tracking-wider font-semibold mb-1">Data da Dieta:</span> <strong id="print-data-geracao" class="text-lg text-emerald-700">-</strong></div>
+                        </div>
+                        <div><span class="text-slate-500 block text-xs uppercase tracking-wider font-semibold">Idade / Sexo:</span> <strong id="print-paciente-idade" class="text-slate-800">-</strong></div>
+                        <div><span class="text-slate-500 block text-xs uppercase tracking-wider font-semibold">Altura:</span> <strong id="print-paciente-altura" class="text-slate-800">-</strong></div>
+                        <div><span class="text-slate-500 block text-xs uppercase tracking-wider font-semibold">Peso Atual:</span> <strong id="print-paciente-peso" class="text-slate-800">-</strong></div>
+                    </div>
+                    
+                    <div id="print-meals-container" class="space-y-8">
+                        <!-- Gerado via JS -->
+                    </div>
+                    
+                    <div class="mt-12 pt-8 border-t border-slate-200 text-sm text-slate-500">
+                        <h4 class="font-bold text-slate-700 mb-2">Orientações Gerais:</h4>
+                        <ul class="list-disc pl-5 space-y-1">
+                            <li>Escolha apenas <strong>uma</strong> opção de substituição por linha.</li>
+                            <li>As quantidades são pensadas para manter as calorias da refeição equivalentes.</li>
+                            <li>Beba no mínimo 35ml de água por kg de peso corporal ao dia.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: BASE DE ALIMENTOS -->
+            <section id="tab-foods" class="tab-content">
+                <div class="mb-6 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Base de Alimentos</h2>
+                        <p class="text-slate-500">Tabela de referência (Kcal e Macros baseados na porção prática).</p>
+                    </div>
+                    <button onclick="openAIFoodModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg text-sm flex items-center transition shadow-sm">
+                        <i data-lucide="plus" class="h-4 w-4 mr-2"></i> Cadastrar com IA
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-600">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-50 border-b">
+                                <tr>
+                                    <th class="px-4 py-3">Alimento</th>
+                                    <th class="px-4 py-3">Grupo/Uso</th>
+                                    <th class="px-4 py-3">Porção Base</th>
+                                    <th class="px-4 py-3">Foco</th>
+                                    <th class="px-4 py-3">Kcal</th>
+                                    <th class="px-4 py-3 text-blue-600">CHO (g)</th>
+                                    <th class="px-4 py-3 text-red-600">PTN (g)</th>
+                                    <th class="px-4 py-3 text-amber-600">LIP (g)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="food-table-body" class="divide-y divide-slate-100">
+                                <!-- Preenchido via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- AI Generator Modal (Dieta) -->
+    <div id="ai-modal" class="modal fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
+        <div class="modal-content bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden relative">
+            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 flex justify-between items-center text-white">
+                <h3 class="font-bold text-lg flex items-center"><i data-lucide="sparkles" class="h-5 w-5 mr-2 text-indigo-200"></i> Nutricionista IA</h3>
+                <button onclick="closeAIModal()" class="text-indigo-100 hover:text-white transition"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            
+            <div class="p-6">
+                <p class="text-sm text-slate-600 mb-4">
+                    Informe os alimentos que você tem em casa ou suas preferências. A inteligência artificial irá montar as porções ideais usando nossa Base de Alimentos para bater sua meta exata de macros e calorias.
+                </p>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Ingredientes Disponíveis / Preferências:</label>
+                    <textarea id="ai-prompt-input" rows="4" class="w-full rounded-lg border-slate-300 border p-3 text-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex: Gosto de comer aveia e ovos de manhã. Pro almoço tenho frango, arroz e feijão."></textarea>
+                </div>
+
+                <div class="bg-indigo-50 text-indigo-800 text-xs rounded-lg p-3 flex items-start">
+                    <i data-lucide="info" class="h-4 w-4 mr-2 mt-0.5 flex-shrink-0"></i>
+                    <p>A dieta será gerada respeitando: <strong><span id="ai-modal-tgt-kcal"></span> kcal</strong> (<span id="ai-modal-pct-c"></span>% C, <span id="ai-modal-pct-p"></span>% P, <span id="ai-modal-pct-g"></span>% G).</p>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button onclick="closeAIModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition">Cancelar</button>
+                <button id="btn-generate-ai" onclick="runAIGeneration()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition flex items-center">
+                    <i data-lucide="wand-2" class="h-4 w-4 mr-2"></i> Gerar Dieta
+                </button>
+            </div>
+            
+            <!-- Loading Overlay within Modal -->
+            <div id="ai-loading-overlay" class="absolute inset-0 bg-white/90 backdrop-blur-sm z-10 hidden flex-col items-center justify-center">
+                <i data-lucide="loader-2" class="h-10 w-10 text-indigo-600 animate-spin mb-3"></i>
+                <p class="text-sm font-semibold text-indigo-900">Calculando porções e macros...</p>
+                <p class="text-xs text-slate-500 mt-1">A mágica leva alguns segundos.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Food Registration Modal (Base de Alimentos) -->
+    <div id="ai-food-modal" class="modal fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
+        <div class="modal-content bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden relative">
+            <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
+                <h3 class="font-bold text-lg flex items-center"><i data-lucide="database-zap" class="h-5 w-5 mr-2 text-indigo-200"></i> Cadastrar Alimento IA</h3>
+                <button onclick="closeAIFoodModal()" class="text-indigo-100 hover:text-white transition"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            
+            <div class="p-6">
+                <p class="text-sm text-slate-600 mb-4">
+                    Digite o nome do alimento. A IA fará a busca na tabela TACO e cadastrará automaticamente os macronutrientes correspondentes à porção base.
+                </p>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Quais alimentos deseja adicionar?</label>
+                    <input type="text" id="ai-food-input" class="w-full rounded-lg border-slate-300 border p-3 text-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex: Abacate, Morango, Lentilha cozida (separados por vírgula)">
+                    <p class="text-xs text-slate-500 mt-2"><i data-lucide="info" class="inline h-3 w-3 mr-1"></i> Dica: Você pode inserir vários alimentos de uma vez separando-os por vírgula.</p>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button onclick="closeAIFoodModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition">Cancelar</button>
+                <button id="btn-generate-ai-food" onclick="runAIFoodRegistration()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition flex items-center">
+                    <i data-lucide="search" class="h-4 w-4 mr-2"></i> Buscar e Salvar
+                </button>
+            </div>
+            
+            <!-- Loading Overlay within Modal -->
+            <div id="ai-food-loading-overlay" class="absolute inset-0 bg-white/90 backdrop-blur-sm z-10 hidden flex-col items-center justify-center">
+                <i data-lucide="loader-2" class="h-10 w-10 text-indigo-600 animate-spin mb-3"></i>
+                <p class="text-sm font-semibold text-indigo-900">Buscando na tabela TACO...</p>
+                <p class="text-xs text-slate-500 mt-1">Extraindo macronutrientes.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Inicializar Icones Lucide
+        lucide.createIcons();
+
+        // Constante da API Gemini injetada pelo ambiente
+        const apiKey = ""; 
+
+        // ==========================================
+        // DADOS E ESTADO (Simulando as planilhas CSV)
+        // ==========================================
+        
+        let patientData = {
+            name: 'Tamires Iamara',
+            sex: 'F',
+            weight: 99.0,
+            height: 170,
+            age: 34
+        };
+
+        // Base de Alimentos
+        const dbFoods = [
+            // CARBO - CAFÉ/LANCHE
+            { id: 'f1', name: 'Aveia', group: 'CafeLanche', baseQty: 30, unit: 'g', focus: 'Carboidrato', kcal: 117, cho: 20, ptn: 5, lip: 3 },
+            { id: 'f2', name: 'Cuscuz cozido', group: 'CafeLanche', baseQty: 100, unit: 'g', focus: 'Carboidrato', kcal: 112, cho: 25.3, ptn: 2, lip: 0.7 },
+            { id: 'f3', name: 'Tapioca (goma)', group: 'CafeLanche', baseQty: 50, unit: 'g', focus: 'Carboidrato', kcal: 168, cho: 42, ptn: 0.1, lip: 0 },
+            { id: 'f4', name: 'Pão francês', group: 'CafeLanche', baseQty: 1, unit: 'un', focus: 'Carboidrato', kcal: 135, cho: 28, ptn: 4.5, lip: 1.8 },
+            { id: 'f5', name: 'Banana', group: 'CafeLanche', baseQty: 1, unit: 'un', focus: 'Carboidrato', kcal: 71, cho: 18, ptn: 0.9, lip: 0.2 },
+            { id: 'f6', name: 'Pera', group: 'CafeLanche', baseQty: 1, unit: 'un', focus: 'Carboidrato', kcal: 81, cho: 21, ptn: 0.5, lip: 0.2 },
+            { id: 'f7', name: 'Mamão', group: 'CafeLanche', baseQty: 150, unit: 'g', focus: 'Carboidrato', kcal: 64, cho: 15, ptn: 0.7, lip: 0.1 },
+            
+            // PROT - CAFÉ/LANCHE
+            { id: 'f8', name: 'Ovo inteiro', group: 'CafeLanche', baseQty: 1, unit: 'un', focus: 'Proteína', kcal: 70, cho: 0.4, ptn: 6, lip: 5 },
+            { id: 'f9', name: 'Whey protein', group: 'CafeLanche', baseQty: 30, unit: 'g', focus: 'Proteína', kcal: 120, cho: 3, ptn: 24, lip: 2 },
+            { id: 'f10', name: 'Leite integral', group: 'CafeLanche', baseQty: 200, unit: 'ml', focus: 'Proteína', kcal: 122, cho: 9.4, ptn: 6.2, lip: 6.6 },
+            { id: 'f11', name: 'Iogurte natural', group: 'CafeLanche', baseQty: 170, unit: 'g', focus: 'Proteína', kcal: 108, cho: 8, ptn: 6.5, lip: 5.5 },
+            { id: 'f12', name: 'Queijo minas frescal', group: 'CafeLanche', baseQty: 50, unit: 'g', focus: 'Proteína', kcal: 132, cho: 1.5, ptn: 8.5, lip: 10 },
+            { id: 'f23', name: 'Clara de ovo', group: 'CafeLanche', baseQty: 1, unit: 'un', focus: 'Proteína', kcal: 17, cho: 0, ptn: 3.6, lip: 0 },
+            
+            // GORDURA - CAFÉ/LANCHE
+            { id: 'f13', name: 'Pasta de amendoim', group: 'CafeLanche', baseQty: 15, unit: 'g', focus: 'Gordura', kcal: 89, cho: 3.2, ptn: 3.8, lip: 7.2 },
+            { id: 'f14', name: 'Castanha de caju', group: 'CafeLanche', baseQty: 15, unit: 'g', focus: 'Gordura', kcal: 86, cho: 4.8, ptn: 2.7, lip: 6.8 },
+
+            // CARBO - ALMOÇO/JANTAR
+            { id: 'f15', name: 'Arroz branco cozido', group: 'AlmocoJantar', baseQty: 100, unit: 'g', focus: 'Carboidrato', kcal: 128, cho: 28.1, ptn: 2.5, lip: 0.2 },
+            { id: 'f16', name: 'Feijão carioca cozido', group: 'AlmocoJantar', baseQty: 100, unit: 'g', focus: 'Carboidrato', kcal: 76, cho: 13.6, ptn: 4.8, lip: 0.5 },
+            { id: 'f17', name: 'Batata inglesa cozida', group: 'AlmocoJantar', baseQty: 100, unit: 'g', focus: 'Carboidrato', kcal: 52, cho: 11.9, ptn: 1.2, lip: 0 },
+            { id: 'f18', name: 'Macarrão cozido', group: 'AlmocoJantar', baseQty: 100, unit: 'g', focus: 'Carboidrato', kcal: 157, cho: 30, ptn: 5.8, lip: 1.2 },
+
+            // PROT - ALMOÇO/JANTAR
+            { id: 'f19', name: 'Peito de frango grelhado', group: 'AlmocoJantar', baseQty: 100, unit: 'g', focus: 'Proteína', kcal: 165, cho: 0, ptn: 31, lip: 3.6 },
+            { id: 'f20', name: 'Patinho moído', group: 'AlmocoJantar', baseQty: 100, unit: 'g', focus: 'Proteína', kcal: 170, cho: 0, ptn: 26, lip: 6.5 },
+            { id: 'f21', name: 'Tilápia', group: 'AlmocoJantar', baseQty: 100, unit: 'g', focus: 'Proteína', kcal: 128, cho: 0, ptn: 26, lip: 2.6 },
+
+            // GORDURA - ALMOÇO/JANTAR
+            { id: 'f22', name: 'Azeite de oliva', group: 'AlmocoJantar', baseQty: 10, unit: 'ml', focus: 'Gordura', kcal: 90, cho: 0, ptn: 0, lip: 10 }
+        ];
+
+        // Tabela de Equivalências (Substituições manuais ou automáticas)
+        const dbEquivalencias = [
+            { name: 'Cuscuz cozido', sub1: 'Pera', sub2: 'Banana' },
+            { name: 'Aveia', sub1: 'Cuscuz cozido', sub2: 'Pera' },
+            { name: 'Ovo inteiro', sub1: 'Leite integral', sub2: 'Queijo minas frescal' },
+            { name: 'Clara de ovo', sub1: 'Ovo inteiro', sub2: 'Whey protein' },
+            { name: 'Whey protein', sub1: 'Iogurte natural', sub2: 'Queijo minas frescal' },
+            { name: 'Leite integral', sub1: 'Whey protein', sub2: 'Iogurte natural' },
+            { name: 'Pasta de amendoim', sub1: 'Castanha de caju', sub2: 'Azeite de oliva' },
+            
+            { name: 'Arroz branco cozido', sub1: 'Batata inglesa cozida', sub2: 'Macarrão cozido' },
+            { name: 'Feijão carioca cozido', sub1: 'Batata inglesa cozida', sub2: 'Arroz branco cozido' },
+            { name: 'Peito de frango grelhado', sub1: 'Patinho moído', sub2: 'Tilápia' },
+            { name: 'Patinho moído', sub1: 'Peito de frango grelhado', sub2: 'Tilápia' },
+            { name: 'Tilápia', sub1: 'Peito de frango grelhado', sub2: 'Patinho moído' }
+        ];
+
+        // Helper para buscar alimento
+        function getFoodByName(name) { return dbFoods.find(f => f.name === name); }
+        function getFoodById(id) { return dbFoods.find(f => f.id === id); }
+
+        // Estado Global da Dieta
+        let dietState = {
+            targetKcal: 1766,
+            pctC: 34,
+            pctP: 33,
+            pctG: 33,
+            meals: [
+                { id: 'm1', name: 'Café da Manhã', group: 'CafeLanche', items: [] },
+                { id: 'm2', name: 'Almoço', group: 'AlmocoJantar', items: [] },
+                { id: 'm3', name: 'Lanche da Tarde', group: 'CafeLanche', items: [] },
+                { id: 'm4', name: 'Jantar', group: 'AlmocoJantar', items: [] }
+            ]
+        };
+
+        // ==========================================
+        // UI & NAVEGAÇÃO
+        // ==========================================
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('aside button').forEach(el => {
+                el.classList.remove('bg-emerald-50', 'text-emerald-600', 'border-emerald-600');
+                el.classList.add('text-slate-600', 'border-transparent');
+            });
+            
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            
+            const btn = document.getElementById(`btn-tab-${tabId}`);
+            if(btn) {
+                btn.classList.remove('text-slate-600', 'border-transparent');
+                btn.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-600');
+            }
+            
+            const mobileSelect = document.getElementById('mobile-nav');
+            if(mobileSelect) mobileSelect.value = tabId;
+
+            if(tabId === 'menu') renderPrintMenu();
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-emerald-600' : 'bg-red-600';
+            const icon = type === 'success' ? 'check-circle' : 'alert-circle';
+            
+            toast.className = `${bgColor} text-white px-4 py-3 rounded shadow-lg flex items-center transition-opacity duration-300 transform translate-y-0 opacity-100`;
+            toast.innerHTML = `<i data-lucide="${icon}" class="h-5 w-5 mr-2"></i> ${message}`;
+            
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // ==========================================
+        // CALCULADORA TMB (Aba 1)
+        // ==========================================
+        
+        window.currentGET = 0;
+
+        function calculateMetabolism() {
+            patientData.name = document.getElementById('calc-name').value || 'Não Informado';
+            patientData.sex = document.getElementById('calc-sex').value;
+            patientData.weight = parseFloat(document.getElementById('calc-weight').value);
+            patientData.height = parseFloat(document.getElementById('calc-height').value);
+            patientData.age = parseInt(document.getElementById('calc-age').value);
+            const activityFactor = parseFloat(document.getElementById('calc-activity').value);
+
+            if(!patientData.weight || !patientData.height || !patientData.age) {
+                showToast('Preencha peso, altura e idade.', 'error');
+                return;
+            }
+
+            let tmb = (10 * patientData.weight) + (6.25 * patientData.height) - (5 * patientData.age);
+            tmb += (patientData.sex === 'M') ? 5 : -161;
+
+            const get = tmb * activityFactor;
+            window.currentGET = get;
+
+            document.getElementById('res-tmb').innerText = tmb.toFixed(0);
+            document.getElementById('res-tmb-kg').innerText = (tmb / patientData.weight).toFixed(1) + ' kcal/kg';
+            
+            document.getElementById('res-get').innerText = get.toFixed(0);
+            document.getElementById('res-get-kg').innerText = (get / patientData.weight).toFixed(1) + ' kcal/kg';
+
+            document.getElementById('meta-emag-mod').innerText = (get - 500).toFixed(0);
+            document.getElementById('meta-emag-leve').innerText = (get - 300).toFixed(0);
+            document.getElementById('meta-manut').innerText = get.toFixed(0);
+            document.getElementById('meta-ganho-leve').innerText = (get + 300).toFixed(0);
+        }
+
+        function setPlannerGoal(kcal) {
+            calculateMetabolism(); // Garante que os dados do paciente foram salvos
+            document.getElementById('plan-target-kcal').value = kcal.toFixed(0);
+            calculateMacrosConfig();
+            switchTab('plan');
+            showToast(`Meta de ${kcal.toFixed(0)} kcal importada com sucesso!`);
+        }
+
+        // ==========================================
+        // PLANEJAMENTO (Aba 2)
+        // ==========================================
+
+        function calculateMacrosConfig() {
+            dietState.targetKcal = parseFloat(document.getElementById('plan-target-kcal').value) || 0;
+            dietState.pctC = parseFloat(document.getElementById('plan-pct-c').value) || 0;
+            dietState.pctP = parseFloat(document.getElementById('plan-pct-p').value) || 0;
+            dietState.pctG = parseFloat(document.getElementById('plan-pct-g').value) || 0;
+
+            const totalPct = dietState.pctC + dietState.pctP + dietState.pctG;
+            const pctEl = document.getElementById('plan-pct-total');
+            pctEl.innerText = totalPct + '%';
+            
+            if (totalPct !== 100) {
+                pctEl.classList.replace('text-slate-700', 'text-red-600');
+            } else {
+                pctEl.classList.replace('text-red-600', 'text-slate-700');
+            }
+
+            updateCalculations();
+        }
+
+        function clearDiet() {
+            if(confirm('Tem certeza que deseja limpar todo o planejamento?')) {
+                dietState.meals.forEach(m => m.items = []);
+                renderPlannerMeals();
+                updateCalculations();
+                showToast('Planejamento limpo.');
+            }
+        }
+
+        function generateFoodOptions(mealGroup) {
+            const foodsInGroup = dbFoods.filter(f => f.group === mealGroup || f.group === 'Todos');
+            let html = `<option value="">Selecione para trocar o alimento...</option>`;
+            const gruposFoco = ['Carboidrato', 'Proteína', 'Gordura'];
+            
+            gruposFoco.forEach(foco => {
+                const foods = foodsInGroup.filter(f => f.focus === foco);
+                if (foods.length > 0) {
+                    html += `<optgroup label="Foco: ${foco}">`;
+                    foods.forEach(f => {
+                        html += `<option value="${f.id}">${f.name}</option>`;
+                    });
+                    html += `</optgroup>`;
+                }
+            });
+            return html;
+        }
+
+        function renderPlannerMeals() {
+            const container = document.getElementById('meals-container');
+            container.innerHTML = '';
+
+            dietState.meals.forEach((meal, mealIndex) => {
+                const mealDiv = document.createElement('div');
+                mealDiv.className = 'bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden';
+                
+                let html = `
+                    <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-700 text-lg">${meal.name}</h3>
+                        <button onclick="addFoodToMeal(${mealIndex})" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center">
+                            <i data-lucide="plus-circle" class="h-4 w-4 mr-1"></i> Add Alimento
+                        </button>
+                    </div>
+                    <div class="p-4">
+                        <div class="space-y-3" id="meal-items-${mealIndex}">
+                `;
+
+                if (meal.items.length === 0) {
+                    html += `<p class="text-sm text-slate-400 italic text-center py-2" id="empty-msg-${mealIndex}">Nenhum alimento adicionado.</p>`;
+                } else {
+                    meal.items.forEach((item, itemIndex) => {
+                        html += `
+                            <div class="flex flex-col md:flex-row items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100 relative group transition-colors hover:bg-slate-100">
+                                <div class="w-full md:w-2/5 flex items-center gap-2">
+                                    <button onclick="removeFoodFromMeal(${mealIndex}, ${itemIndex})" class="text-slate-400 hover:text-red-600 p-1.5 rounded transition bg-white border border-slate-200 shadow-sm" title="Remover este item e inserir novo">
+                                        <i data-lucide="trash-2" class="h-4 w-4"></i>
+                                    </button>
+                                    <select onchange="updateItemFood(${mealIndex}, ${itemIndex}, this.value)" class="w-full rounded border-slate-300 border p-2 text-sm focus:ring-emerald-500">
+                                        ${generateFoodOptions(meal.group).replace(`value="${item.foodId}"`, `value="${item.foodId}" selected`)}
+                                    </select>
+                                </div>
+                                <div class="w-full md:w-1/4 flex items-center gap-2">
+                                    <input type="number" onchange="updateItemQty(${mealIndex}, ${itemIndex}, this.value)" value="${item.qty}" min="0" step="1" class="w-20 rounded border-slate-300 border p-2 text-sm text-center focus:ring-emerald-500 font-bold text-emerald-700">
+                                    <span class="text-xs font-medium text-slate-500 whitespace-nowrap">${item.unit} / ${item.calcKcal.toFixed(0)} kcal</span>
+                                </div>
+                                <div class="w-full md:w-1/3 flex justify-between text-xs text-slate-600 font-medium px-2 border-l border-slate-200 pl-4">
+                                    <div class="text-center"><span class="block text-[10px] text-blue-400">C (g)</span>${item.calcCho.toFixed(1)}</div>
+                                    <div class="text-center"><span class="block text-[10px] text-red-400">P (g)</span>${item.calcPtn.toFixed(1)}</div>
+                                    <div class="text-center"><span class="block text-[10px] text-amber-400">G (g)</span>${item.calcLip.toFixed(1)}</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                html += `</div>`;
+
+                const subtotal = calculateMealSubtotal(meal);
+                html += `
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between text-sm items-center">
+                        <span class="font-bold text-slate-700">Subtotal</span>
+                        <div class="flex gap-4 font-semibold">
+                            <span class="text-slate-800">${subtotal.kcal.toFixed(0)} kcal</span>
+                            <span class="text-blue-600 hidden sm:inline">${subtotal.cho.toFixed(1)}c</span>
+                            <span class="text-red-600 hidden sm:inline">${subtotal.ptn.toFixed(1)}p</span>
+                            <span class="text-amber-600 hidden sm:inline">${subtotal.lip.toFixed(1)}g</span>
+                        </div>
+                    </div>
+                `;
+                
+                html += `</div>`;
+                mealDiv.innerHTML = html;
+                container.appendChild(mealDiv);
+            });
+            
+            lucide.createIcons();
+            updateCalculations();
+        }
+
+        function addFoodToMeal(mealIndex) {
+            const meal = dietState.meals[mealIndex];
+            meal.items.push({
+                foodId: '', qty: 0, unit: '-', calcKcal: 0, calcCho: 0, calcPtn: 0, calcLip: 0
+            });
+            renderPlannerMeals();
+        }
+
+        function removeFoodFromMeal(mealIndex, itemIndex) {
+            dietState.meals[mealIndex].items.splice(itemIndex, 1);
+            renderPlannerMeals();
+        }
+
+        function updateItemFood(mealIndex, itemIndex, foodId) {
+            const item = dietState.meals[mealIndex].items[itemIndex];
+            const food = getFoodById(foodId);
+            
+            if (food) {
+                item.foodId = foodId;
+                item.qty = food.baseQty;
+                item.unit = food.unit;
+                recalcItem(item, food);
+            } else {
+                item.foodId = ''; item.qty = 0; item.unit = '-';
+                item.calcKcal = 0; item.calcCho = 0; item.calcPtn = 0; item.calcLip = 0;
+            }
+            renderPlannerMeals();
+        }
+
+        function updateItemQty(mealIndex, itemIndex, newQty) {
+            const item = dietState.meals[mealIndex].items[itemIndex];
+            const food = getFoodById(item.foodId);
+            item.qty = parseFloat(newQty) || 0;
+            
+            if (food) recalcItem(item, food);
+            renderPlannerMeals(); 
+        }
+
+        function recalcItem(item, food) {
+            const ratio = item.qty / food.baseQty;
+            item.calcKcal = food.kcal * ratio;
+            item.calcCho = food.cho * ratio;
+            item.calcPtn = food.ptn * ratio;
+            item.calcLip = food.lip * ratio;
+        }
+
+        function calculateMealSubtotal(meal) {
+            return meal.items.reduce((acc, item) => {
+                acc.kcal += item.calcKcal || 0;
+                acc.cho += item.calcCho || 0;
+                acc.ptn += item.calcPtn || 0;
+                acc.lip += item.calcLip || 0;
+                return acc;
+            }, { kcal: 0, cho: 0, ptn: 0, lip: 0 });
+        }
+
+        function updateCalculations() {
+            const targetKcal = dietState.targetKcal;
+            
+            const targetChoG = (targetKcal * (dietState.pctC / 100)) / 4;
+            const targetPtnG = (targetKcal * (dietState.pctP / 100)) / 4;
+            const targetLipG = (targetKcal * (dietState.pctG / 100)) / 9;
+
+            document.getElementById('tgt-kcal').innerText = targetKcal.toFixed(0);
+            document.getElementById('tgt-c').innerText = targetChoG.toFixed(0);
+            document.getElementById('tgt-p').innerText = targetPtnG.toFixed(0);
+            document.getElementById('tgt-g').innerText = targetLipG.toFixed(0);
+
+            let currKcal = 0, currCho = 0, currPtn = 0, currLip = 0;
+            
+            dietState.meals.forEach(meal => {
+                const sub = calculateMealSubtotal(meal);
+                currKcal += sub.kcal;
+                currCho += sub.cho;
+                currPtn += sub.ptn;
+                currLip += sub.lip;
+            });
+
+            document.getElementById('curr-kcal').innerText = currKcal.toFixed(0);
+            document.getElementById('curr-c').innerText = currCho.toFixed(0);
+            document.getElementById('curr-p').innerText = currPtn.toFixed(0);
+            document.getElementById('curr-g').innerText = currLip.toFixed(0);
+
+            const pctKcal = Math.min((currKcal / targetKcal) * 100, 100) || 0;
+            const pctCho = Math.min((currCho / targetChoG) * 100, 100) || 0;
+            const pctPtn = Math.min((currPtn / targetPtnG) * 100, 100) || 0;
+            const pctLip = Math.min((currLip / targetLipG) * 100, 100) || 0;
+
+            document.getElementById('bar-kcal').style.width = `${pctKcal}%`;
+            document.getElementById('bar-c').style.width = `${pctCho}%`;
+            document.getElementById('bar-p').style.width = `${pctPtn}%`;
+            document.getElementById('bar-g').style.width = `${pctLip}%`;
+
+            document.getElementById('curr-kcal').className = currKcal > targetKcal + 50 ? 'text-red-500 font-bold' : 'text-slate-800 font-bold';
+        }
+
+        // ==========================================
+        // GERAÇÃO DE PDF E IMPRESSÃO
+        // ==========================================
+        function generatePDF() {
+            const element = document.getElementById('print-area');
+            
+            // Adiciona classe que limpa o layout do sistema
+            element.classList.add('pdf-export-mode');
+
+            const opt = {
+                margin:       10,
+                filename:     `Cardapio_${patientData.name || 'Cliente'}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            // Usando a biblioteca adicionada no head
+            html2pdf().set(opt).from(element).save().then(() => {
+                // Remove a classe após a geração
+                element.classList.remove('pdf-export-mode');
+                showToast("PDF gerado com sucesso!");
+            }).catch(err => {
+                element.classList.remove('pdf-export-mode');
+                showToast("Erro ao gerar PDF", "error");
+            });
+        }
+
+
+        // ==========================================
+        // UTILITÁRIO API (FETCH RETRY)
+        // ==========================================
+        async function fetchWithRetry(url, options, retries = 5) {
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return await response.json();
+                } catch (error) {
+                    if (i === retries - 1) throw error;
+                    await new Promise(res => setTimeout(res, delays[i]));
+                }
+            }
+        }
+
+        // ==========================================
+        // GERAÇÃO DE DIETA POR IA
+        // ==========================================
+
+        function openAIModal() {
+            document.getElementById('ai-modal-tgt-kcal').innerText = dietState.targetKcal;
+            document.getElementById('ai-modal-pct-c').innerText = dietState.pctC;
+            document.getElementById('ai-modal-pct-p').innerText = dietState.pctP;
+            document.getElementById('ai-modal-pct-g').innerText = dietState.pctG;
+            document.getElementById('ai-modal').classList.add('active');
+        }
+
+        function closeAIModal() {
+            document.getElementById('ai-modal').classList.remove('active');
+            document.getElementById('ai-loading-overlay').classList.remove('flex');
+            document.getElementById('ai-loading-overlay').classList.add('hidden');
+        }
+
+        async function runAIGeneration() {
+            const userInput = document.getElementById('ai-prompt-input').value.trim();
+            if (!userInput) {
+                showToast("Por favor, digite os ingredientes ou preferências.", "error");
+                return;
+            }
+
+            document.getElementById('ai-loading-overlay').classList.remove('hidden');
+            document.getElementById('ai-loading-overlay').classList.add('flex');
+
+            const targetKcal = dietState.targetKcal;
+            const targetChoG = (targetKcal * (dietState.pctC / 100)) / 4;
+            const targetPtnG = (targetKcal * (dietState.pctP / 100)) / 4;
+            const targetLipG = (targetKcal * (dietState.pctG / 100)) / 9;
+
+            const foodsStr = dbFoods.map(f => `${f.id}: ${f.name} (Refeição: ${f.group} | Porção Ref: ${f.baseQty}${f.unit} | Kcal: ${f.kcal} | C: ${f.cho}g | P: ${f.ptn}g | G: ${f.lip}g)`).join('\n');
+
+            const systemInstruction = `Você é um nutricionista matemático especialista em cálculo de dietas restritas.
+Sua missão é distribuir os alimentos da BASE DE DADOS em 4 refeições (m1=Café da Manhã, m2=Almoço, m3=Lanche, m4=Jantar).
+Regras ABSOLUTAMENTE OBRIGATÓRIAS:
+1. USE APENAS OS IDs DOS ALIMENTOS FORNECIDOS NA BASE DE DADOS.
+2. TOTAL DIÁRIO EXATO a atingir: ${targetKcal.toFixed(0)} kcal, ${targetChoG.toFixed(0)}g Carboidratos, ${targetPtnG.toFixed(0)}g Proteínas, ${targetLipG.toFixed(0)}g Gorduras.
+3. DISTRIBUIÇÃO DE CALORIAS POR REFEIÇÃO (Aproximada):
+   - m1 (Café da Manhã): ~${(targetKcal * 0.25).toFixed(0)} kcal
+   - m2 (Almoço): ~${(targetKcal * 0.35).toFixed(0)} kcal
+   - m3 (Lanche da Tarde): ~${(targetKcal * 0.15).toFixed(0)} kcal
+   - m4 (Jantar): ~${(targetKcal * 0.25).toFixed(0)} kcal
+4. ATENÇÃO MÁXIMA ÀS QUANTIDADES (qty): NUNCA PREENCHA "qty: 1" NAS DEMAIS REFEIÇÕES POR PREGUIÇA. Você deve calcular a quantidade REAL (qty) de CADA ALIMENTO em TODAS AS 4 REFEIÇÕES. Exemplo: se for arroz, coloque 100, 150. Se for aveia, 30, 40. Se for frango, 120. Apenas alimentos unitários (un) como banana, ovo e clara de ovo devem ter valores como 1, 2, 3 ou 4. Faça a matemática para m1, m2, m3 e m4!
+5. Respeite os grupos: alimentos do grupo 'CafeLanche' em m1 e m3. Alimentos do 'AlmocoJantar' em m2 e m4.`;
+
+            const promptText = `ALIMENTOS DISPONÍVEIS NA BASE DE DADOS:\n${foodsStr}\n\nPREFERÊNCIAS DO USUÁRIO / O QUE TEM EM CASA:\n"${userInput}"\n\nGere o plano alimentar ajustando as porções reais (qty) em gramas, ml ou unidades para CADA alimento selecionado em CADA UMA das 4 refeições. Devolva exclusivamente no formato JSON especificado.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: promptText }] }],
+                systemInstruction: { parts: [{ text: systemInstruction }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            meals: {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        id: { type: "STRING" },
+                                        items: {
+                                            type: "ARRAY",
+                                            items: {
+                                                type: "OBJECT",
+                                                properties: {
+                                                    foodId: { type: "STRING" },
+                                                    qty: { type: "NUMBER" }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                const result = await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const textResult = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!textResult) throw new Error("Retorno vazio da IA.");
+
+                const planData = JSON.parse(textResult);
+
+                dietState.meals.forEach(meal => {
+                    const generatedMeal = planData.meals.find(m => m.id === meal.id);
+                    if(generatedMeal && generatedMeal.items) {
+                        meal.items = [];
+                        generatedMeal.items.forEach(genItem => {
+                            const food = getFoodById(genItem.foodId);
+                            if(food) {
+                                const newItem = {
+                                    foodId: food.id,
+                                    qty: Math.round(genItem.qty),
+                                    unit: food.unit,
+                                    calcKcal: 0, calcCho: 0, calcPtn: 0, calcLip: 0
+                                };
+                                recalcItem(newItem, food);
+                                meal.items.push(newItem);
+                            }
+                        });
+                    }
+                });
+
+                renderPlannerMeals();
+                closeAIModal();
+                showToast("Dieta gerada com sucesso pela IA!");
+
+            } catch (error) {
+                console.error("Erro:", error);
+                showToast("Falha ao gerar a dieta. Tente novamente.", "error");
+                document.getElementById('ai-loading-overlay').classList.add('hidden');
+                document.getElementById('ai-loading-overlay').classList.remove('flex');
+            }
+        }
+
+
+        // ==========================================
+        // CADASTRAR ALIMENTO POR IA (Aba 4)
+        // ==========================================
+
+        function openAIFoodModal() {
+            document.getElementById('ai-food-modal').classList.add('active');
+        }
+
+        function closeAIFoodModal() {
+            document.getElementById('ai-food-modal').classList.remove('active');
+            document.getElementById('ai-food-loading-overlay').classList.remove('flex');
+            document.getElementById('ai-food-loading-overlay').classList.add('hidden');
+        }
+
+        async function runAIFoodRegistration() {
+            const foodName = document.getElementById('ai-food-input').value.trim();
+            if (!foodName) {
+                showToast("Digite o nome do alimento.", "error");
+                return;
+            }
+
+            document.getElementById('ai-food-loading-overlay').classList.remove('hidden');
+            document.getElementById('ai-food-loading-overlay').classList.add('flex');
+
+            const systemInstruction = `Você é um nutricionista com profundo conhecimento da Tabela TACO e outras tabelas nutricionais oficiais.
+Sua missão é receber o nome de um ou MAIS alimentos (separados por vírgula) e devolver os macronutrientes EXATOS correspondentes a uma porção prática de CADA UM (ex: 100g, 1 unidade, 1 colher).
+Classifique o grupo de cada alimento como 'CafeLanche' se for mais consumido em cafés/lanches (pães, frutas, leite) ou 'AlmocoJantar' para refeições maiores (carnes, arroz, feijão, legumes).
+Classifique o focus como o macronutriente predominante ('Carboidrato', 'Proteína', ou 'Gordura').
+Retorne ESTRITAMENTE uma LISTA (ARRAY) em formato JSON preenchendo todos os campos para cada alimento solicitado.`;
+
+            const promptText = `Quero cadastrar os seguintes alimentos: "${foodName}". Retorne a lista JSON com as informações nutricionais completas e corretas para cada um deles.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: promptText }] }],
+                systemInstruction: { parts: [{ text: systemInstruction }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                name: { type: "STRING", description: "Nome formatado do alimento, ex: Abacate" },
+                                group: { type: "STRING", description: "Deve ser exatamente 'CafeLanche' ou 'AlmocoJantar'" },
+                                baseQty: { type: "NUMBER", description: "Quantidade base da porção, ex: 100, 1, 15" },
+                                unit: { type: "STRING", description: "Unidade de medida: 'g', 'ml', 'un', ou 'fatia'" },
+                                focus: { type: "STRING", description: "Deve ser exatamente 'Carboidrato', 'Proteína' ou 'Gordura'" },
+                                kcal: { type: "NUMBER" },
+                                cho: { type: "NUMBER", description: "Carboidratos em gramas" },
+                                ptn: { type: "NUMBER", description: "Proteínas em gramas" },
+                                lip: { type: "NUMBER", description: "Gorduras/Lipídios em gramas" }
+                            },
+                            required: ["name", "group", "baseQty", "unit", "focus", "kcal", "cho", "ptn", "lip"]
+                        }
+                    }
+                }
+            };
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                const result = await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const textResult = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!textResult) throw new Error("Retorno vazio da IA.");
+
+                const newFoodsList = JSON.parse(textResult);
+                
+                let addedCount = 0;
+                newFoodsList.forEach(newFood => {
+                    // Gerar ID unico usando também um random para evitar conflito caso processe muito rápido
+                    newFood.id = 'f_ai_' + Date.now() + Math.floor(Math.random() * 1000);
+                    // Adiciona a base
+                    dbFoods.unshift(newFood);
+                    addedCount++;
+                });
+
+                // Atualiza a tabela
+                renderFoodDatabase();
+                
+                // Atualiza os dropdowns do planejamento
+                renderPlannerMeals();
+
+                closeAIFoodModal();
+                document.getElementById('ai-food-input').value = '';
+                showToast(`${addedCount} alimento(s) cadastrado(s) com sucesso!`);
+
+            } catch (error) {
+                console.error("Erro no cadastro:", error);
+                showToast("Erro ao buscar alimento(s) na IA. Tente novamente.", "error");
+                document.getElementById('ai-food-loading-overlay').classList.add('hidden');
+                document.getElementById('ai-food-loading-overlay').classList.remove('flex');
+            }
+        }
+
+
+        // ==========================================
+        // CARDÁPIO E SUBSTITUIÇÕES (Aba 3)
+        // ==========================================
+
+        function getSubstitutions(originalFood) {
+            // Busca substituição na tabela fixada (dbEquivalencias) ou encontra opções do mesmo foco e grupo
+            const eqData = dbEquivalencias.find(e => e.name === originalFood.name);
+            let sub1Food = null;
+            let sub2Food = null;
+
+            if (eqData) {
+                sub1Food = getFoodByName(eqData.sub1);
+                sub2Food = getFoodByName(eqData.sub2);
+            } else {
+                // Se foi gerado pela IA ou não tem na tabela manual, busca dois alimentos do mesmo focus e grupo
+                const similarFoods = dbFoods.filter(f => f.focus === originalFood.focus && f.group === originalFood.group && f.id !== originalFood.id);
+                if(similarFoods.length > 0) sub1Food = similarFoods[0];
+                if(similarFoods.length > 1) sub2Food = similarFoods[1];
+            }
+
+            return { sub1Food, sub2Food };
+        }
+
+        function renderPrintMenu() {
+            // Sincronizar dados do paciente antes de renderizar
+            calculateMetabolism(); 
+
+            // Pega a data atual do sistema para colocar na impressão
+            const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+            document.getElementById('print-meta-kcal').innerText = dietState.targetKcal.toFixed(0);
+            document.getElementById('print-paciente-nome').innerText = patientData.name;
+            document.getElementById('print-data-geracao').innerText = dataAtual;
+            document.getElementById('print-paciente-idade').innerText = `${patientData.age} anos / ${patientData.sex === 'M' ? 'Masc' : 'Fem'}`;
+            document.getElementById('print-paciente-altura').innerText = `${patientData.height} cm`;
+            document.getElementById('print-paciente-peso').innerText = `${patientData.weight.toFixed(1)} kg`;
+
+            const container = document.getElementById('print-meals-container');
+            container.innerHTML = '';
+
+            let hasItems = false;
+
+            dietState.meals.forEach(meal => {
+                if (meal.items.length === 0) return;
+                hasItems = true;
+
+                const mealDiv = document.createElement('div');
+                mealDiv.className = 'print-break mb-8';
+                
+                let html = `
+                    <h3 class="text-xl font-bold text-emerald-700 border-b-2 border-emerald-100 pb-2 mb-4 uppercase tracking-wide">${meal.name}</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 border-b-2 border-slate-200 text-slate-700">
+                                    <th class="p-3 w-1/3">Alimento Principal</th>
+                                    <th class="p-3 w-1/6 text-center border-l border-slate-200">Porção e Kcal</th>
+                                    <th class="p-3 w-1/2 border-l border-slate-200">Opções de Substituição Inteligente</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                meal.items.forEach(item => {
+                    const food = getFoodById(item.foodId);
+                    if(!food) return;
+
+                    const originalKcal = item.calcKcal;
+                    const { sub1Food, sub2Food } = getSubstitutions(food);
+                    
+                    let subs = [];
+                    if (sub1Food) {
+                        const eqQty = (originalKcal / sub1Food.kcal) * sub1Food.baseQty;
+                        subs.push({ name: sub1Food.name, qty: eqQty.toFixed(1), unit: sub1Food.unit, kcal: originalKcal });
+                    }
+                    if (sub2Food) {
+                        const eqQty = (originalKcal / sub2Food.kcal) * sub2Food.baseQty;
+                        subs.push({ name: sub2Food.name, qty: eqQty.toFixed(1), unit: sub2Food.unit, kcal: originalKcal });
+                    }
+
+                    let subText = '<span class="text-slate-400 italic text-xs">Mantém a dieta (Sem substituição)</span>';
+                    
+                    if (subs.length > 0) {
+                        subText = subs.map((s, i) => `
+                            <div class="mb-1 pb-1 border-b border-slate-100 last:border-0 text-xs text-slate-700">
+                                <span class="font-bold text-emerald-600 mr-1">Opção ${i+1}:</span> 
+                                <strong>${s.qty}${s.unit}</strong> de ${s.name} <span class="text-[10px] text-slate-400">/ ${Math.round(s.kcal)} kcal</span>
+                            </div>
+                        `).join('');
+                    }
+
+                    html += `
+                        <tr class="border-b border-slate-200 hover:bg-slate-50">
+                            <td class="p-3 font-medium text-slate-800">${food.name} <span class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-1">${food.focus}</span></td>
+                            <td class="p-3 text-center bg-emerald-50/50 border-l border-slate-200">
+                                <div class="font-bold text-emerald-700 text-lg">${item.qty}<span class="text-xs font-normal text-slate-500 ml-1">${item.unit}</span></div>
+                                <div class="text-[10px] text-slate-500 bg-emerald-100/50 rounded inline-block px-1.5 py-0.5 mt-1">/ ${originalKcal.toFixed(0)} kcal</div>
+                            </td>
+                            <td class="p-3 border-l border-slate-200">${subText}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `</tbody></table></div>`;
+                mealDiv.innerHTML = html;
+                container.appendChild(mealDiv);
+            });
+
+            if(!hasItems) {
+                container.innerHTML = `<div class="text-center text-slate-500 py-10 bg-slate-50 rounded-lg">Volte à aba de Planejamento e adicione alimentos para gerar o cardápio.</div>`;
+            }
+        }
+
+
+        // ==========================================
+        // BASE DE ALIMENTOS (Aba 4)
+        // ==========================================
+        
+        function renderFoodDatabase() {
+            const tbody = document.getElementById('food-table-body');
+            tbody.innerHTML = '';
+            
+            dbFoods.forEach(food => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50";
+                
+                let focusClass = "bg-slate-100 text-slate-600";
+                if(food.focus === 'Carboidrato') focusClass = "bg-blue-100 text-blue-700";
+                if(food.focus === 'Proteína') focusClass = "bg-red-100 text-red-700";
+                if(food.focus === 'Gordura') focusClass = "bg-amber-100 text-amber-700";
+
+                tr.innerHTML = `
+                    <td class="px-4 py-3 font-medium text-slate-800">${food.name}</td>
+                    <td class="px-4 py-3 text-xs">${food.group === 'CafeLanche' ? 'Café/Lanche' : 'Almoço/Jantar'}</td>
+                    <td class="px-4 py-3">${food.baseQty} ${food.unit}</td>
+                    <td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${focusClass}">${food.focus}</span></td>
+                    <td class="px-4 py-3 font-bold">${food.kcal}</td>
+                    <td class="px-4 py-3 text-blue-600">${food.cho}</td>
+                    <td class="px-4 py-3 text-red-600">${food.ptn}</td>
+                    <td class="px-4 py-3 text-amber-600">${food.lip}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ==========================================
+        // INITIALIZATION
+        // ==========================================
+        
+        window.onload = () => {
+            calculateMetabolism(); 
+            renderFoodDatabase();
+            calculateMacrosConfig();
+            renderPlannerMeals();
+        };
+
+    </script>
+</body>
+</html>
